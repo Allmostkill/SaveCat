@@ -5,23 +5,56 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <title>Водный Конг</title>
 <style>
-*{margin:0;padding:0;box-sizing:border-box}
-body{background:#111;display:flex;flex-direction:column;align-items:center;
-  justify-content:center;height:100vh;overflow:hidden;touch-action:none;font-family:monospace}
-#title{color:#ffd700;font-size:16px;font-weight:bold;letter-spacing:3px;
-  text-shadow:0 0 12px #ffd700;margin-bottom:6px}
-canvas{border:2px solid #ffd700;border-radius:8px;
-  box-shadow:0 0 30px rgba(255,215,0,0.3)}
-#btns{display:flex;gap:16px;margin-top:10px}
-.b{width:72px;height:72px;background:rgba(255,215,0,0.1);
-  border:2px solid rgba(255,215,0,0.3);border-radius:50%;
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{
+  width:100%;height:100%;
+  background:#0a0a0a;
+  overflow:hidden;
+  touch-action:none;
+  font-family:monospace;
+  display:flex;flex-direction:column;
+  align-items:center;justify-content:flex-start;
+}
+#title{
+  color:#ffd700;
+  font-size:clamp(12px,3.5vw,17px);
+  font-weight:bold;letter-spacing:3px;
+  text-shadow:0 0 12px #ffd700;
+  padding:6px 0 4px;
+  flex-shrink:0;
+  user-select:none;
+}
+#cw{
+  flex-shrink:0;
+  border:2px solid #ffd700;
+  border-radius:10px;
+  box-shadow:0 0 24px rgba(255,215,0,0.25);
+  overflow:hidden;
+  display:block;
+}
+canvas{display:block;}
+#btns{
+  display:flex;gap:clamp(20px,8vw,48px);
+  padding:8px 0 env(safe-area-inset-bottom,8px);
+  flex-shrink:0;
+}
+.b{
+  width:clamp(64px,18vw,88px);
+  height:clamp(64px,18vw,88px);
+  background:rgba(255,215,0,0.08);
+  border:2px solid rgba(255,215,0,0.25);
+  border-radius:50%;
   display:flex;align-items:center;justify-content:center;
-  font-size:26px;cursor:pointer;user-select:none}
+  font-size:clamp(22px,6vw,32px);
+  cursor:pointer;user-select:none;
+  -webkit-user-select:none;
+}
+.b:active{background:rgba(255,215,0,0.28);}
 </style>
 </head>
 <body>
 <div id="title">&#128167; ВОДНЫЙ КОНГ &#128167;</div>
-<canvas id="c"></canvas>
+<div id="cw"><canvas id="c"></canvas></div>
 <div id="btns">
 <div class="b" id="bl">&#9664;</div>
 <div class="b" id="br">&#9654;</div>
@@ -31,9 +64,25 @@ var cv = document.getElementById('c');
 var cx = cv.getContext('2d');
 
 // размер под экран
-var W = Math.min(360, window.innerWidth - 8);
-var H = Math.min(560, window.innerHeight - 120);
+// Размер: заполняем всё свободное место между заголовком и кнопками
+function calcSize() {
+  var titleH = document.getElementById('title').offsetHeight || 30;
+  var btnsH  = document.getElementById('btns').offsetHeight  || 80;
+  var pad = 8; // минимальные отступы
+  var avW = window.innerWidth - 4;
+  var avH = window.innerHeight - titleH - btnsH - pad;
+  // соотношение сторон 9:16 (телефон портрет)
+  var ratio = 9/16;
+  var W2, H2;
+  if (avW / avH < ratio) { W2 = avW; H2 = Math.floor(W2/ratio); }
+  else { H2 = avH; W2 = Math.floor(H2*ratio); }
+  W2 = Math.max(220, W2); H2 = Math.max(380, H2);
+  return {w: W2, h: H2};
+}
+var sz = calcSize();
+var W = sz.w, H = sz.h;
 cv.width = W; cv.height = H;
+cv.style.width = W+'px'; cv.style.height = H+'px';
 var S = W / 360;
 var FL = H - 44 * S; // уровень пола
 
@@ -45,6 +94,7 @@ var dropSpd = 3 * S, maxB = 3, depSpd = 1.5 * S;
 var depX = W/2, depTX = W/2, depMT = 0;
 var catX = W/2, catVX = 0;
 var bottles = [], parts = [], bonus = null;
+var cansCollected = 0;
 var bonusTimer = 0, bonusInterval = 900; // ~15 sec at 60fps
 var shieldTimer = 0; // frames of shield active
 var sTimer = 0, sReady = false;
@@ -143,7 +193,7 @@ br.addEventListener('touchend',function(e){e.preventDefault();K['ArrowRight']=fa
 function startGame() {
   score=0; lives=3; level=1; fc=0;
   catX=W/2; catVX=0;
-  bottles=[]; parts=[]; bonus=null; bonusTimer=0; bonusInterval=900; shieldTimer=0;
+  bottles=[]; parts=[]; bonus=null; bonusTimer=0; bonusInterval=900; shieldTimer=0; cansCollected=0;
   spawnT=0; sulT=0;
   depX=W/2; depTX=W/2; depMT=0;
   applyDiff();
@@ -355,8 +405,8 @@ function drawHUD() {
   cx.fillRect(4*S,4*S,140*S,30*S);
   cx.strokeStyle='rgba(255,215,0,0.4)'; cx.lineWidth=1;
   cx.strokeRect(4*S,4*S,140*S,30*S);
-  cx.fillStyle='#ffd700'; cx.font='bold '+Math.round(12*S)+'px monospace'; cx.textAlign='left';
-  cx.fillText('СЧЁТ: '+score, 10*S, 25*S);
+  cx.fillStyle='#ffd700'; cx.font='bold '+Math.round(11*S)+'px monospace'; cx.textAlign='left';
+  cx.fillText('СЧЁТ: '+score, 9*S, 24*S);
 
   // жизни
   cx.textAlign='right'; cx.fillStyle='#ff6b6b';
@@ -460,21 +510,59 @@ function drawSplash() {
 }
 
 function drawDead() {
-  cx.fillStyle='rgba(10,0,0,0.88)'; cx.fillRect(0,0,W,H);
+  // затемнение
+  cx.fillStyle='rgba(0,0,0,0.78)'; cx.fillRect(0,0,W,H);
+
+  // панель по центру
+  var pw=W*0.82, ph=H*0.44;
+  var px=W/2-pw/2, py=H/2-ph/2;
+  cx.fillStyle='rgba(20,0,0,0.92)';
+  cx.beginPath();
+  cx.moveTo(px+10*S,py); cx.lineTo(px+pw-10*S,py);
+  cx.arcTo(px+pw,py,px+pw,py+10*S,10*S);
+  cx.lineTo(px+pw,py+ph-10*S);
+  cx.arcTo(px+pw,py+ph,px+pw-10*S,py+ph,10*S);
+  cx.lineTo(px+10*S,py+ph);
+  cx.arcTo(px,py+ph,px,py+ph-10*S,10*S);
+  cx.lineTo(px,py+10*S);
+  cx.arcTo(px,py,px+10*S,py,10*S);
+  cx.closePath(); cx.fill();
+  cx.strokeStyle='rgba(255,60,60,0.5)'; cx.lineWidth=1.5;
+  cx.stroke();
+
   cx.textAlign='center';
-  cx.shadowColor='#ff2020'; cx.shadowBlur=16*S;
-  cx.fillStyle='#ff4455'; cx.font='bold '+Math.round(28*S)+'px Arial,sans-serif';
-  cx.fillText('GAME OVER',W/2,H/2-44*S);
+
+  // GAME OVER
+  cx.shadowColor='#ff2020'; cx.shadowBlur=20*S;
+  cx.fillStyle='#ff4455';
+  cx.font='bold '+Math.round(30*S)+'px Arial,sans-serif';
+  cx.fillText('GAME OVER',W/2,py+ph*0.28);
   cx.shadowBlur=0;
-  cx.fillStyle='#aaa'; cx.font=Math.round(12*S)+'px monospace';
-  cx.fillText('Котёнок не уцелел...',W/2,H/2-12*S);
-  cx.shadowColor='#ffd700'; cx.shadowBlur=10*S;
-  cx.fillStyle='#ffd700'; cx.font='bold '+Math.round(24*S)+'px monospace';
-  cx.fillText(score+' очков',W/2,H/2+20*S);
+
+  // subtitle
+  cx.fillStyle='rgba(200,200,200,0.75)';
+  cx.font=Math.round(11*S)+'px monospace';
+  cx.fillText('Котёнок не уцелел...',W/2,py+ph*0.44);
+
+  // score
+  cx.shadowColor='#ffd700'; cx.shadowBlur=12*S;
+  cx.fillStyle='#ffd700';
+  cx.font='bold '+Math.round(26*S)+'px monospace';
+  cx.fillText(score+' очков',W/2,py+ph*0.65);
   cx.shadowBlur=0;
-  cx.fillStyle='rgba(150,200,255,'+(0.4+0.5*Math.sin(fc*.08))+')';
-  cx.font=Math.round(12*S)+'px monospace';
-  cx.fillText('ТАП / ПРОБЕЛ — снова',W/2,H/2+54*S);
+
+  // cans collected
+  if (cansCollected > 0) {
+    cx.fillStyle='rgba(0,220,200,0.9)';
+    cx.font=Math.round(10*S)+'px monospace';
+    cx.fillText('⚡ банок LIT: '+cansCollected, W/2, py+ph*0.76);
+  }
+
+  // blink
+  var a=0.4+0.5*Math.sin(fc*.1);
+  cx.fillStyle='rgba(120,190,255,'+a+')';
+  cx.font=Math.round(11*S)+'px monospace';
+  cx.fillText('ТАП / ПРОБЕЛ — снова',W/2,py+ph*0.9);
 }
 
 
@@ -671,6 +759,7 @@ function loop() {
         bonus.alive = false;
         bonus = null;
         shieldTimer = 360; // 6 секунд защиты
+        cansCollected++;
         addPts(catX, FL-20*S, '#00dcc8', 16);
         addPts(catX, FL-20*S, '#00ff88', 10);
       }
