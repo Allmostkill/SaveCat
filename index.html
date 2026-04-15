@@ -150,7 +150,7 @@ function updDep(){
   var freq=Math.max(20,55-level*4);
   if(depMT>freq){depMT=0;depTX=Math.random()<0.85?catX:20*S+Math.random()*(W-40*S);}
   var dx=depTX-depX;
-  if(Math.abs(dx)>2)depX+=Math.sign(dx)*depSpd;
+  if(Math.abs(dx)>2)depX+=Math.sign(dx)*depSpd*dt;
   depX=Math.max(12*S,Math.min(W-12*S,depX));
 }
 function spawn(){
@@ -165,11 +165,11 @@ function drawBG(){
   cx.fillStyle='#3a2a10';cx.fillRect(0,FL,W,H-FL);
   cx.fillStyle='rgba(255,160,40,0.18)';cx.fillRect(0,FL-5*S,W,5*S);
   cx.fillStyle='#5a4020';cx.fillRect(0,FL,W,3*S);
-  for(var i=0;i<14;i++){
+  if(fc%2===0){for(var i=0;i<14;i++){
     var sx=(i*211)%W,sy=(i*137)%(FL*.85);
     cx.fillStyle='rgba(255,255,255,'+(0.06+0.12*Math.sin(fc*.03+i))+')';
     cx.fillRect(sx,sy,1.5,1.5);
-  }
+  }}
 }
 
 function drawShadows(){
@@ -197,10 +197,9 @@ function drawDep(){
 
 function drawBot(b){
   var BW=28*S,BH=52*S;
-  for(var i=0;i<b.trail.length;i++){
-    cx.save();cx.globalAlpha=(i/b.trail.length)*.25;
-    cx.fillStyle='#6ec6ff';
-    cx.beginPath();cx.arc(b.trail[i].x,b.trail[i].y,Math.max(.5,(2-i*.18)*S),0,Math.PI*2);cx.fill();cx.restore();
+  if(b.trail.length>0){
+    cx.save();cx.globalAlpha=.2;cx.fillStyle='#6ec6ff';
+    cx.beginPath();cx.arc(b.trail[0].x,b.trail[0].y,2*S,0,Math.PI*2);cx.fill();cx.restore();
   }
   cx.save();cx.translate(b.x,b.y);cx.rotate(b.rot);
   if(botCv)cx.drawImage(botCv,-BW/2,-BH/2,BW,BH);
@@ -259,9 +258,8 @@ function drawBonus(){
   var bob=Math.sin(bonus.pulse*.08)*3*S;
   cx.save();cx.translate(bonus.x,FL-22*S+bob);
   var glow=.35+.35*Math.sin(bonus.pulse*.1);
-  var gr=cx.createRadialGradient(0,0,6*S,0,0,26*S);
-  gr.addColorStop(0,'rgba(0,220,200,'+glow+')');gr.addColorStop(1,'transparent');
-  cx.fillStyle=gr;cx.beginPath();cx.arc(0,0,26*S,0,Math.PI*2);cx.fill();
+  cx.fillStyle='rgba(0,220,200,'+glow+')';
+  cx.beginPath();cx.arc(0,0,22*S,0,Math.PI*2);cx.fill();
   if(shieldImg)cx.drawImage(shieldImg,-14*S,-26*S,28*S,50*S);
   else{cx.fillStyle='#00dcc8';cx.fillRect(-14*S,-26*S,28*S,50*S);}
   cx.fillStyle='rgba(0,220,200,'+(0.7+.3*Math.sin(bonus.pulse*.12))+')';
@@ -273,10 +271,9 @@ function drawBonus(){
 function drawShield(){
   if(shieldT<=0)return;
   var cy=FL-20*S,alpha=Math.min(1,shieldT/30)*(.5+.4*Math.sin(fc*.2));
-  cx.save();cx.globalAlpha=alpha;
-  var gr=cx.createRadialGradient(catX,cy,10*S,catX,cy,32*S);
-  gr.addColorStop(0,'rgba(0,220,200,.15)');gr.addColorStop(.7,'rgba(0,220,200,.3)');gr.addColorStop(1,'transparent');
-  cx.fillStyle=gr;cx.beginPath();cx.arc(catX,cy,32*S,0,Math.PI*2);cx.fill();
+  cx.save();cx.globalAlpha=alpha*.4;
+  cx.fillStyle='rgba(0,220,200,0.5)';
+  cx.beginPath();cx.arc(catX,cy,30*S,0,Math.PI*2);cx.fill();
   cx.globalAlpha=alpha*.8;cx.strokeStyle='#00dcc8';cx.lineWidth=2*S;
   cx.beginPath();cx.arc(catX,cy,30*S,0,Math.PI*2);cx.stroke();cx.restore();
   var pct=shieldT/360;
@@ -368,8 +365,11 @@ function drawDead(){
 }
 
 // ── главный цикл ──
-function loop(){
+function loop(now){
   requestAnimationFrame(loop);
+  // delta time — нормализуем к 60fps
+  var dt = now ? Math.min((now - (loop.last||now)) / 16.67, 3) : 1;
+  loop.last = now;
   cx.clearRect(0,0,W,H);
 
   if(state==='loading'){
@@ -396,8 +396,8 @@ function loop(){
     // кот
     if(K.left){catVX=-5.5*S;catDir=-1;}
     else if(K.right){catVX=5.5*S;catDir=1;}
-    else catVX*=.72;
-    catX+=catVX;
+    else catVX*=Math.pow(.72,dt);
+    catX+=catVX*dt;
     catX=Math.max(18*S,Math.min(W-18*S,catX));
     if(Math.abs(catVX)>.5){catAT++;if(catAT>6){catAF++;catAT=0;}}
     if(catInv>0)catInv--;
@@ -407,8 +407,8 @@ function loop(){
     // бутылки — только вертикально
     for(var i=0;i<bottles.length;i++){
       var b=bottles[i];
-      b.trail.push({x:b.x,y:b.y});if(b.trail.length>8)b.trail.shift();
-      b.vy+=.13*S;b.y+=b.vy;b.rot+=b.rs;
+      b.trail.push({x:b.x,y:b.y});if(b.trail.length>3)b.trail.shift();
+      b.vy+=.13*S*dt;b.y+=b.vy*dt;b.rot+=b.rs*dt;
       if(b.y>H+40*S){b.dead=true;score+=4;}
     }
     bottles=bottles.filter(function(b){return!b.dead;});
@@ -427,7 +427,7 @@ function loop(){
     }
 
     // частицы
-    for(var i=0;i<parts.length;i++){var p=parts[i];p.x+=p.vx;p.y+=p.vy;p.vy+=.15*S;p.life-=.025;}
+    for(var i=0;i<parts.length;i++){var p=parts[i];p.x+=p.vx*dt;p.y+=p.vy*dt;p.vy+=.15*S*dt;p.life-=.025*dt;}
     parts=parts.filter(function(p){return p.life>0;});
 
     if(sulT>0)sulT--;
