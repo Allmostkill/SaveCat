@@ -150,7 +150,7 @@ function updDep(){
   var freq=Math.max(20,55-level*4);
   if(depMT>freq){depMT=0;depTX=Math.random()<0.85?catX:20*S+Math.random()*(W-40*S);}
   var dx=depTX-depX;
-  if(Math.abs(dx)>2)depX+=Math.sign(dx)*depSpd*dt;
+  if(Math.abs(dx)>2)depX+=Math.sign(dx)*depSpd;
   depX=Math.max(12*S,Math.min(W-12*S,depX));
 }
 function spawn(){
@@ -367,9 +367,16 @@ function drawDead(){
 // ── главный цикл ──
 function loop(now){
   requestAnimationFrame(loop);
-  // delta time — нормализуем к 60fps
-  var dt = now ? Math.min((now - (loop.last||now)) / 16.67, 3) : 1;
-  loop.last = now;
+  // dt: нормализуем к 60fps, минимум 0.5 чтобы не застывало
+  var dt = 1;
+  if(loop.last){
+    var elapsed = (now||0) - loop.last;
+    if(elapsed > 0 && elapsed < 500){
+      dt = elapsed / 16.67;
+    }
+  }
+  dt = Math.max(0.5, Math.min(dt, 3)); // всегда движемся, но не взрываемся
+  loop.last = now || performance.now();
   cx.clearRect(0,0,W,H);
 
   if(state==='loading'){
@@ -394,10 +401,10 @@ function loop(now){
   if(state==='play'){
     fc++;
     // кот
-    if(K.left){catVX=-5.5*S;catDir=-1;}
-    else if(K.right){catVX=5.5*S;catDir=1;}
-    else catVX*=Math.pow(.72,dt);
-    catX+=catVX*dt;
+    if(K.left){catVX=-5.5*S*dt;catDir=-1;}
+    else if(K.right){catVX=5.5*S*dt;catDir=1;}
+    else catVX*=.75;
+    catX+=catVX;
     catX=Math.max(18*S,Math.min(W-18*S,catX));
     if(Math.abs(catVX)>.5){catAT++;if(catAT>6){catAF++;catAT=0;}}
     if(catInv>0)catInv--;
@@ -408,7 +415,7 @@ function loop(now){
     for(var i=0;i<bottles.length;i++){
       var b=bottles[i];
       b.trail.push({x:b.x,y:b.y});if(b.trail.length>3)b.trail.shift();
-      b.vy+=.13*S*dt;b.y+=b.vy*dt;b.rot+=b.rs*dt;
+      b.vy+=.10*S;b.y+=b.vy*dt;b.rot+=b.rs;
       if(b.y>H+40*S){b.dead=true;score+=4;}
     }
     bottles=bottles.filter(function(b){return!b.dead;});
@@ -427,7 +434,7 @@ function loop(now){
     }
 
     // частицы
-    for(var i=0;i<parts.length;i++){var p=parts[i];p.x+=p.vx*dt;p.y+=p.vy*dt;p.vy+=.15*S*dt;p.life-=.025*dt;}
+    for(var i=0;i<parts.length;i++){var p=parts[i];p.x+=p.vx;p.y+=p.vy;p.vy+=.15*S;p.life-=.025;}
     parts=parts.filter(function(p){return p.life>0;});
 
     if(sulT>0)sulT--;
@@ -460,7 +467,7 @@ function loop(now){
   }
 }
 
-requestAnimationFrame(loop);
+loop.last = performance.now(); requestAnimationFrame(loop);
 
 }); // end window.load
 </script>
