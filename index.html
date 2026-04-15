@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<title>Водный Конг</title>
+<title>Тут не хайпуй да</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{
@@ -17,66 +17,54 @@ html,body{
 }
 #title{
   color:#ffd700;
-  font-size:clamp(12px,3.5vw,17px);
-  font-weight:bold;letter-spacing:3px;
+  font-size:clamp(11px,3vw,16px);
+  font-weight:bold;letter-spacing:2px;
   text-shadow:0 0 12px #ffd700;
-  padding:6px 0 4px;
+  padding:4px 0 3px;
   flex-shrink:0;
   user-select:none;
 }
 #cw{
-  flex-shrink:0;
+  flex:1;
+  width:100%;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  overflow:hidden;
+}
+canvas{
+  display:block;
   border:2px solid #ffd700;
   border-radius:10px;
   box-shadow:0 0 24px rgba(255,215,0,0.25);
-  overflow:hidden;
-  display:block;
 }
-canvas{display:block;}
-#btns{
-  display:flex;gap:clamp(20px,8vw,48px);
-  padding:8px 0 env(safe-area-inset-bottom,8px);
-  flex-shrink:0;
-}
-.b{
-  width:clamp(64px,18vw,88px);
-  height:clamp(64px,18vw,88px);
-  background:rgba(255,215,0,0.08);
-  border:2px solid rgba(255,215,0,0.25);
-  border-radius:50%;
-  display:flex;align-items:center;justify-content:center;
-  font-size:clamp(22px,6vw,32px);
-  cursor:pointer;user-select:none;
-  -webkit-user-select:none;
-}
-.b:active{background:rgba(255,215,0,0.28);}
+/* touch hint overlay inside canvas — drawn via JS */
 </style>
 </head>
 <body>
 <div id="title">&#128167; ВОДНЫЙ КОНГ &#128167;</div>
 <div id="cw"><canvas id="c"></canvas></div>
-<div id="btns">
-<div class="b" id="bl">&#9664;</div>
-<div class="b" id="br">&#9654;</div>
-</div>
+
 <script>
 var cv = document.getElementById('c');
 var cx = cv.getContext('2d');
 
 // размер под экран
-// Размер: заполняем всё свободное место между заголовком и кнопками
+// Размер: весь экран минус заголовок
 function calcSize() {
-  var titleH = document.getElementById('title').offsetHeight || 30;
-  var btnsH  = document.getElementById('btns').offsetHeight  || 80;
-  var pad = 8; // минимальные отступы
-  var avW = window.innerWidth - 4;
-  var avH = window.innerHeight - titleH - btnsH - pad;
-  // соотношение сторон 9:16 (телефон портрет)
+  var titleH = document.getElementById('title').offsetHeight || 26;
+  var pad = 4;
+  var avW = window.innerWidth - pad;
+  var avH = window.innerHeight - titleH - pad;
+  // подбираем максимальный размер с соотношением 9:16
   var ratio = 9/16;
   var W2, H2;
   if (avW / avH < ratio) { W2 = avW; H2 = Math.floor(W2/ratio); }
   else { H2 = avH; W2 = Math.floor(H2*ratio); }
-  W2 = Math.max(220, W2); H2 = Math.max(380, H2);
+  // если экран шире чем 9:16 — берём по высоте
+  if (W2 > avW) { W2 = avW; H2 = Math.floor(W2/ratio); }
+  if (H2 > avH) { H2 = avH; W2 = Math.floor(H2*ratio); }
+  W2 = Math.max(240, W2); H2 = Math.max(400, H2);
   return {w: W2, h: H2};
 }
 var sz = calcSize();
@@ -164,24 +152,36 @@ window.addEventListener('keydown', function(e) {
 });
 window.addEventListener('keyup', function(e) { K[e.code] = false; });
 
-var tStart = null;
+// Управление тачем: левая половина = влево, правая = вправо
 cv.addEventListener('touchstart', function(e) {
   e.preventDefault();
   if (state==='splash' && sReady) { startGame(); return; }
   if (state==='dead') { startGame(); return; }
-  tStart = e.touches[0].clientX;
+  updateTouch(e.touches);
 }, {passive:false});
 cv.addEventListener('touchmove', function(e) {
   e.preventDefault();
-  if (tStart === null) return;
-  var dx = e.touches[0].clientX - tStart;
-  K['ArrowLeft'] = dx < -12;
-  K['ArrowRight'] = dx > 12;
+  updateTouch(e.touches);
 }, {passive:false});
 cv.addEventListener('touchend', function(e) {
   e.preventDefault();
-  K['ArrowLeft'] = false; K['ArrowRight'] = false; tStart = null;
+  if (e.touches.length === 0) {
+    K['ArrowLeft'] = false; K['ArrowRight'] = false;
+  } else {
+    updateTouch(e.touches);
+  }
 }, {passive:false});
+
+function updateTouch(touches) {
+  if (!touches || touches.length === 0) return;
+  // Получаем координату X относительно canvas
+  var rect = cv.getBoundingClientRect();
+  var tx = touches[0].clientX - rect.left;
+  var mid = W / 2;
+  // Левее середины = влево, правее = вправо
+  K['ArrowLeft']  = tx < mid - 10;
+  K['ArrowRight'] = tx >= mid + 10;
+}
 
 var bl = document.getElementById('bl');
 var br = document.getElementById('br');
@@ -644,6 +644,27 @@ function drawShield() {
   cx.restore();
 }
 
+
+// подсказка управления (первые 5 секунд)
+function drawHint() {
+  if (fc > 300 || state !== 'play') return;
+  var alpha = fc < 240 ? 1 : (300-fc)/60;
+  cx.save();
+  cx.globalAlpha = alpha * 0.55;
+  // левая зона
+  cx.fillStyle = 'rgba(255,255,255,0.06)';
+  cx.fillRect(0, FL*0.3, W/2-2, FL*0.65);
+  // правая зона
+  cx.fillRect(W/2+2, FL*0.3, W/2-2, FL*0.65);
+  cx.globalAlpha = alpha * 0.5;
+  cx.fillStyle = '#fff';
+  cx.font = Math.round(22*S)+'px monospace';
+  cx.textAlign = 'center';
+  cx.fillText('◀', W/4, FL*0.62);
+  cx.fillText('▶', W*3/4, FL*0.62);
+  cx.restore();
+}
+
 // главный цикл
 function loop() {
   requestAnimationFrame(loop);
@@ -679,6 +700,7 @@ function loop() {
   drawShield();
   drawCat();
   drawBonus();
+  drawHint();
   drawHUD();
 
   if (state==='play') {
